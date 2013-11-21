@@ -7,16 +7,18 @@ import random
 class Polymer:
 
 
-    def __init__(self, D, L, IS_SELF_AVOIDING=False):
+    def __init__(self, D, L, IS_SELF_AVOIDING=False, reflect=False):
         """
         Initialize Polymer constructor..
         @param D: The dimensionality of the polymer.
         @param L: The length of each dimension of the Polymer's lattice.
         @param IS_SELF_AVOIDING: Bool, Toggle creation as simple Random Walk or as Self-avoiding walk (by loop-removal)
+        @param reflect: Bool, Use reflecting boundary conditions.
         """
         self.D = D
         self.L = L
         self.IS_SELF_AVOIDING = IS_SELF_AVOIDING
+        self.reflect = reflect
 
         self.dims = np.array([L] * D, dtype=np.int)
 
@@ -62,9 +64,13 @@ class Polymer:
 
             #Boundary check.
             if (cur_point >= self.L).any() or (cur_point<0).any():
-                print "curdir = ", cur_point , " brakeing. "
-                print "Did only %d steps!!!!" % i
-                break
+                if self.reflect:
+                    #In order to reflect, revert the last step, and make another step backwards.
+                    cur_point = cur_point - step*2
+                else:
+                    print "curdir = ", cur_point , " brakeing. "
+                    print "Did only %d steps!!!!" % i
+                    break
 
             prev_step = step
             point_tup = tuple(cur_point)
