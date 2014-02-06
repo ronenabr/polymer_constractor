@@ -7,7 +7,7 @@ import random
 class Polymer:
 
 
-    def __init__(self, D, L, IS_SELF_AVOIDING=False, reflect=False):
+    def __init__(self, D, L, IS_LOOP_AVOIDING=False, reflect=False, IS_SELF_AVOIDING = False, CAN_GO_BACK=False):
         """
         Initialize Polymer constructor..
         @param D: The dimensionality of the polymer.
@@ -17,6 +17,8 @@ class Polymer:
         """
         self.D = D
         self.L = L
+        self.IS_LOOP_AVOIDING = IS_LOOP_AVOIDING
+        self.CAN_GO_BACK = CAN_GO_BACK
         self.IS_SELF_AVOIDING = IS_SELF_AVOIDING
         self.reflect = reflect
 
@@ -57,7 +59,7 @@ class Polymer:
             step = random.choice(self.possible_steps)
 
             #Make sure we do not go backwards.  (Should be only in SAW?)
-            while (prev_step + step == self.zero_step).all():
+            while (not self.CAN_GO_BACK)  and (prev_step + step == self.zero_step).all():
                 step = random.choice(self.possible_steps)
 
             cur_point = cur_point + step
@@ -76,7 +78,7 @@ class Polymer:
             point_tup = tuple(cur_point)
 
             #IF SAW, check for loop and remove them.
-            if self.IS_SELF_AVOIDING:
+            if self.IS_LOOP_AVOIDING :
                 if grid[point_tup] != 0:
                     start_collision = grid[point_tup]
                     end_collision = i
@@ -85,7 +87,9 @@ class Polymer:
                     #print "clean from  %d to %d " % (start_collision, end_collision)
                     grid[np.logical_and(grid>start_collision , grid<end_collision) ] = 0
                     i = start_collision
-
+            elif self.IS_SELF_AVOIDING:
+                if grid[point_tup] != 0:
+                    break
             grid[point_tup] = i
 
         return cur_point, i, grid

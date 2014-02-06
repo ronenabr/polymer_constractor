@@ -11,9 +11,10 @@ from matplotlib import pylab
 
 def linear(x,a,b):
     return a*x+b
+import pandas as pd
 
 collect_mu_N = []
-def draw_distribution(D,L,N,iterations,self_avoid, data_per_N):
+def draw_distribution(D,L,N,iterations,loop_avoid, data_per_N):
 
     #PDF stuff
     pylab.figure()
@@ -27,15 +28,15 @@ def draw_distribution(D,L,N,iterations,self_avoid, data_per_N):
     pylab.xlabel("R")
     pylab.ylabel("Count (normelized)")
     pylab.legend()
-    pylab.savefig("histogram_D=%d_N=%d_self_avoid=%d.pdf" % (D, N, self_avoid))
+    pylab.savefig("histogram_D=%d_N=%d_loop_avoid=%d.pdf" % (D, N, loop_avoid))
 
 
     global collect_mu_N
     collect_mu_N.append(param)
 
-def simulate_sequence(D, L, iterations, min_size, max_size, step_size, self_avoid, reflect):
+def simulate_sequence(D, L, iterations, min_size, max_size, step_size, loop_avoid, reflect):
 
-    poly = Polymer(D, L, self_avoid, reflect=reflect)
+    poly = Polymer(D, L, loop_avoid, reflect=reflect)
     data = []
 
     for N in range(min_size,max_size, step_size):
@@ -45,37 +46,36 @@ def simulate_sequence(D, L, iterations, min_size, max_size, step_size, self_avoi
         for i in range(iterations):
             (last, count, grid) = poly.create_polymer(N)
             dist = linalg.norm(last - poly.start_point)
-
-            if count == N:
-                data_per_N.append(dist)
-            else:
-                bad_number += 1
+            #print [dist,count,N]
+            df = pd.DataFrame({"dist":[dist], "N": [N], "count" : [count]})
+            data.append(df)
 
             #Save some example realization.
             if i == 10 and D == 2:
                 pylab.figure()
-                pylab.imshow(grid, cmap=pylab.get_cmap("binary"))
-                pylab.savefig("realization_N=%d_self_avoid=%d" % (N, self_avoid))
+                pylab.imshow(grid, cmap=pylab.get_cmap("binary"), interpolation="none")
+                pylab.savefig("realization_N=%d_self_avoid=%d" % (N, loop_avoid))
 
         bad_ratio = 1.0*bad_number/iterations
         if bad_ratio > 0.02:
             print "To many bads with N=%d. Bad ratio %.3f" % (N, bad_ratio)
-        data_per_N = array(data_per_N)
-
-        draw_distribution(D,L,N,iterations,self_avoid, data_per_N)
 
 
-        R2 = (data_per_N**2).mean()
-        data.append((R2, N))
+        #draw_distribution(D,L,N,iterations,loop_avoid, data_per_N)
 
+
+        #R2 = (data_per_N**2).mean()
+        #data.append((R2, N))
+
+    data = pd.concat(data)
     return data
 
-def fit_result(data, D, self_avoid):
-    a_data = array(data)
-    x = log(a_data.T[1])
-    y = log(a_data.T[0])
+def fit_result(x,y, D, self_avoid):
 
-    print x,y
+    x = log(x)
+    y = log(y)
+
+
     popt, pcov = scipy.optimize.curve_fit(linear, x,y)
 
     extrapolated_y = linear(x,popt[0],popt[1])
@@ -97,18 +97,43 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Simulate polymer")
     parser.add_argument("-D", type=int, nargs='?', default=2)
     parser.add_argument("-L", type=int, nargs='?', default=500)
-    parser.add_argument("--self_avoid", type=bool, nargs='?', default=False)
-    parser.add_argument("--reflect", type=bool, nargs='?', default=False)
+
+    parser.add_argument('--loop_avoid',dest='loop_avoid',action='store_true')
+    parser.add_argument('--no-loop_avoid',dest='loop_avoid',action='store_false')
+    parser.set_defaults(loop_avoid=True)
+
+    
+    parser.add_argument('--reflect',dest='reflect',action='store_true')
+    parser.add_argument('--no-reflect',dest='loop_avoid',action='store_false')
+    parser.set_defaults(reflect=True)
+
     parser.add_argument("--iterations", type=int, nargs='?', default=500)
     parser.add_argument("--min_size", type=int, nargs='?', default=50)
     parser.add_argument("--max_size", type=int, nargs='?', default=500)
     parser.add_argument("--step_size", type=int, nargs='?', default=50)
+    parser.add_argument("--out", type=str, nargs='?', default=".")
+
 
 
 
     args = parser.parse_args()
+    args.loop_avoid = True
+    print args
+    import os
+    try:
+        os.makedirs(args.out)
+    except:
+        print "dir exists"
+    os.chdir(args.out)
 
-    data = simulate_sequence(args.D, args.L, args.iterations, args.min_size, args.max_size, args.step_size, args.self_avoid, args.reflect)
-    print data
-    fit_result(data, args.D, args.self_avoid)
+    data = simulate_sequence(args.D, args.L, args.iterations, args.min_size, args.max_size, args.step_size, True, args.reflect)
+    data.to_hdf("D=%d_L=%d_loop_avoid=%d_reflect=%d.hdf.pd" % (args.D,args.L,args.loop_avoid,args.reflect ), "a")
+
+    data["R^2"] = data["dist"] ** 2
+    agg = data.groupby("count").mean()
+
+    x = agg["R^2"].values
+    y = agg.index.values
+
+    fit_result(x,y, args.D, args.loop_avoid)
 
