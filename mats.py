@@ -1,3 +1,6 @@
+#Generate all the 3x3 representations of the  octahedral group, with enerys in {-1,0,1}
+
+
 import numpy
 from numpy.linalg import det, eig
 from numpy import array
